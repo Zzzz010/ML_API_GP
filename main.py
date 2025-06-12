@@ -11,8 +11,8 @@ import joblib
 app = FastAPI(title="API Prediksi Saldo 7 Hari")
 
 # Load model dan scaler saat startup
-model = tf.keras.models.load_model('model/my_lstm_model.keras')
-scaler_y = joblib.load('model/scaler_y.pkl')
+model = tf.keras.models.load_model('my_lstm_model.keras')
+scaler_y = joblib.load('scaler_y.pkl')
 
 # Struktur input
 class InputData(BaseModel):
