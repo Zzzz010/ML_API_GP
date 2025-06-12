@@ -11,6 +11,8 @@ os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'  # Nonaktifkan oneDNN
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # Matikan GPU
 import tensorflow as tf
 import joblib
+import warnings
+warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
 
 # Inisialisasi app FastAPI
 app = FastAPI(title="API Prediksi Saldo 7 Hari")
