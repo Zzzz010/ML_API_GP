@@ -1,46 +1,65 @@
-# To the extent possible under law, the author(s) have dedicated all copyright
-# and related and neighboring rights to this software to the public domain worldwide.
-# This software is distributed without any warranty.
-# See <http://creativecommons.org/publicdomain/zero/1.0/> for a copy of the CC0 license.
+# This file is released into the public domain (CC0 1.0 Universal).
+# https://creativecommons.org/publicdomain/zero/1.0/
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import numpy as np
 import os
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'  # Nonaktifkan oneDNN
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # Matikan GPU
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, conlist
+import numpy as np
 import tensorflow as tf
 import joblib
-import warnings
-warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
+from typing import List
 
-# Inisialisasi app FastAPI
-app = FastAPI(title="API Prediksi Saldo 7 Hari")
+# Force CPU usage untuk hindari error GPU di deployment
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-# Load model dan scaler saat startup
-model = tf.keras.models.load_model('model/my_lstm_model.keras')
-scaler_y = joblib.load('model/scaler_y.pkl')
+app = FastAPI(
+    title="API Prediksi Saldo 7 Hari",
+    description="API untuk memprediksi saldo 7 hari ke depan menggunakan model LSTM"
+)
 
-# Struktur input
+# Load model dengan error handling
+try:
+    model_path = os.path.join(os.path.dirname(__file__), 'model/my_lstm_model.keras')
+    scaler_path = os.path.join(os.path.dirname(__file__), 'model/scaler_y.pkl')
+    model = tf.keras.models.load_model(model_path)
+    scaler_y = joblib.load(scaler_path)
+except Exception as e:
+    raise RuntimeError(f"Gagal memuat model: {str(e)}")
+
+# Validasi input ketat
 class InputData(BaseModel):
-    fitur: list[list[float]]  # input 2D: 14 hari x jumlah fitur
+    fitur: List[conlist(float, min_length=4, max_length=4)]  # 14 hari x 4 fitur
 
-# Endpoint prediksi
-@app.post("/predict")
+@app.post("/predict", 
+          response_model=dict,
+          description="Prediksi saldo 7 hari ke depan",
+          responses={
+              400: {"description": "Input tidak valid"},
+              500: {"description": "Internal server error"}
+          })
 def predict(data: InputData):
     try:
-        input_array = np.array(data.fitur)
+        input_array = np.array(data.fitur, dtype=np.float32)
+        
         if input_array.shape != (14, 4):
             raise ValueError("Input harus berukuran 14x4 (14 hari, 4 fitur).")
 
+        # Reshape untuk LSTM (batch_size, timesteps, features)
         input_array = input_array.reshape(1, 14, 4)
 
         # Prediksi
         pred_scaled = model.predict(input_array)
         pred_asli = scaler_y.inverse_transform(pred_scaled)
 
-        # Return hasil sebagai list
-        return {"prediksi_saldo": [int(x) for x in pred_asli[0]]}
+        return {
+            "prediksi_saldo": [round(float(x), 2) for x in pred_asli[0]],  # Konversi ke float untuk JSON
+            "status": "sukses"
+        }
 
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Terjadi kesalahan internal: {str(e)}"
+        )
