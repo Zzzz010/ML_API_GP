@@ -4,6 +4,9 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import numpy as np
+import os
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'  # Nonaktifkan oneDNN
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # Matikan GPU
 import tensorflow as tf
 import joblib
 
