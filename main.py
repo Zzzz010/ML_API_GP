@@ -36,4 +36,4 @@ def predict(data: InputData):
         return {"prediksi_saldo": [int(x) for x in pred_asli[0]]}
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400,detail=str(e))
